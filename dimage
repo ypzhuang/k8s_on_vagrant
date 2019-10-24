@@ -1,0 +1,85 @@
+#!/bin/bash
+
+readonly IMG_DIR="$(pwd)/images"
+readonly META_FILE="$(pwd)/images/meta"
+
+save() {
+  if [[ ! -d "${IMG_DIR}" ]]; then
+    echo "[DEBUG] creating ${IMG_DIR}"
+    mkdir "${IMG_DIR}"
+  fi
+
+  echo "[DEBUG] creating ${META_FILE} ..."
+  echo "$(docker images|grep -v 'IMAGE ID'|grep -v '<none>'|awk '{printf("%s %s %s\n", $1, $2, $3)}'|column -t)" > "${META_FILE}"
+
+
+  local images
+  while read -r image; do
+     images+=("$image");
+  done <<< "$(cat ${META_FILE})"
+
+
+  local name tag id
+  for image in "${images[@]}"; do
+    name=$(echo $image|awk '{print $1}')
+    fname=$(echo $name | sed -e "s/[/]/_/g")
+
+    tag=$(echo $image|awk '{print $2}')
+    id=$(echo $image|awk '{print $3}')
+
+    if [[ "${id}" != "" ]]; then
+      local imgPath="${IMG_DIR}/${fname}.${tag}.dim"
+
+      if [[ ! -f "${imgPath}" ]] ; then
+        echo "[DEBUG] saving ${id} ${name}:${tag} to ${imgPath} ..."
+        (time  docker save -o "${imgPath}" ${name}:${tag}) 2>&1 | grep real
+      else
+        echo "[DEBUG] ${id} ${name}:${tag} already saved"
+      fi
+    fi
+  done
+}
+
+load() {
+  echo "[DEBUG] loading ${META_FILE} ..."
+  if [[ ! -f "${META_FILE}" ]]; then
+    echo "[ERROR] ${META_FILE} does not exists"
+    exit 0
+  fi
+
+  if [[ ! -d "${IMG_DIR}" ]]; then
+    echo "[ERROR] ${IMG_DIR} does not exists"
+    exit 0
+  fi
+
+  local images
+  while read -r image; do
+     images+=("$image");
+  done <<< "$(cat ${META_FILE})"
+
+  local name tag id
+  for image in "${images[@]}"; do
+    name=$(echo $image|awk '{print $1}')
+    fname=$(echo $name | sed -e "s/[/]/_/g")
+    tag=$(echo $image|awk '{print $2}')
+    id=$(echo $image|awk '{print $3}')
+
+    if [[ "${id}" != "" ]]; then
+      local imgPath="${IMG_DIR}/${fname}.${tag}.dim"
+
+      if [[ "$(docker images|grep ${id} | grep ${name} | grep ${tag})" == "" ]]; then
+        if [[ "$(docker images|grep ${id})" == "" ]]; then
+          echo "[DEBUG] loading ${id} ${name}:${tag} from ${imgPath} ..."
+          docker load -i "${imgPath}"
+        else
+          echo "[DEBUG] tagging ${id} as ${name}:${tag} ..."
+          docker tag ${id} ${name}:${tag}
+        fi
+      else
+        echo "[DEBUG] ${id} ${name}:${tag} already loaded"
+      fi
+    fi
+  done
+}
+
+$@
