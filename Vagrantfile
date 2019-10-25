@@ -179,6 +179,12 @@ deb http://mirrors.aliyun.com/ubuntu/ $(lsb_release -cs)-backports main restrict
       if [[ $1 == "yes" ]]; then
          # load k8s images from files 
          if [[ ! -d /vagrant/images ]]; then
+            if [[ ! -f /vagrant/images.tar.gz  ]]; then
+              # images_url=https://github.com/ypzhuang/k8s_on_vagrant/releases/download/v1.0/images.tar.gz
+              images_url=https://code.aliyun.com/bdease_k8s/images/raw/51b105597d99dba36f171d1be02a8f51054e431f/images.tar.gz
+              echo "May take a long time to download K8S Images from $images_url ...." 
+              curl -sL  $images_url -o /vagrant/images.tar.gz     
+            fi             
             tar zxvf /vagrant/images.tar.gz -C /vagrant/
          fi
          cd /vagrant/ && sudo ./dimage load
