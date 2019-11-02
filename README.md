@@ -38,9 +38,9 @@ UBUNTU_RELEASE = "ubuntu/bionic64"  # ubuntu/xenial64:16.04 ubuntu/bionic64 18.0
 
 | IP | Role | Hostname |
 | :-----| :----- | :-----|
-| 192.168.9.11 | manager | u1|
-| 192.168.9.12 | worker  | u2|
-| 192.168.9.13 | worker  | u3|
+| 192.168.33.11 | manager | u1|
+| 192.168.33.12 | worker  | u2|
+| 192.168.33.13 | worker  | u3|
 | .... | worker  | ..|
 
 ## Version Info
