@@ -1,15 +1,15 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
 
-NODE_VCPUS = 2 #number of cpu
-NODE_MASTER_MEMORY_SIZE = 2048 # memory size of master node(MB)
+NODE_VCPUS = 4 #number of cpu
+NODE_MASTER_MEMORY_SIZE = 4096 # memory size of master node(MB)
 NODE_WORKER_MEMORY_SIZE = 2048 # memory size of worker nodes(MB)
-NODES = 2 # number of nodes, you can set 1 only for a master node
-IN_CHINA = 'yes' # yes or no,  yes: who who cannot connect to Google K8S source.
+NODES = 3 # number of nodes, you can set 1 only for a master node
+IN_CHINA = 'no' # yes or no,  yes: who who cannot connect to Google K8S source.
 UBUNTU_RELEASE = "ubuntu/bionic64"  # ubuntu/xenial64:16.04 ubuntu/bionic64:18.04
 
 def workerIP(num)
-  return "192.168.9.1#{num}"
+  return "192.168.33.1#{num}"
 end
 
 Vagrant.configure("2") do |config|
@@ -117,14 +117,14 @@ deb http://mirrors.aliyun.com/ubuntu/ $(lsb_release -cs)-backports main restrict
 
 
   config.vm.provision "shell", privileged: false, args: [NODES], inline: <<-SHELL
-    if grep -qF "192.168.9" /etc/hosts;then
+    if grep -qF "192.168.33" /etc/hosts;then
       echo "Host mapping skips."
     else
        echo "Host name mapping"       
        number=$1
        for i in $(seq 1 $number) 
        do  
-         echo "192.168.9.1$i u$i" | sudo tee -a /etc/hosts
+         echo "192.168.33.1$i u$i" | sudo tee -a /etc/hosts
        done       
     fi     
   SHELL
@@ -206,7 +206,7 @@ deb http://mirrors.aliyun.com/ubuntu/ $(lsb_release -cs)-backports main restrict
     if [[ $hostname == "u1" ]]; then
       echo 'manager node...'  
       if [[ ! -f "$HOME/.kube/config"  ]]; then
-        sudo kubeadm init --apiserver-advertise-address=192.168.9.11  --pod-network-cidr=10.244.0.0/16 #Canal
+        sudo kubeadm init --apiserver-advertise-address=192.168.33.11  --pod-network-cidr=10.244.0.0/16 #Canal
 
         mkdir -p $HOME/.kube
         sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
@@ -228,7 +228,7 @@ deb http://mirrors.aliyun.com/ubuntu/ $(lsb_release -cs)-backports main restrict
         echo 'get join command...'
         token=$(kubeadm token list | grep -v TOKEN | awk '{printf("%s", $1)}')
         hash=$(openssl x509 -pubkey -in /etc/kubernetes/pki/ca.crt | openssl rsa -pubin -outform der 2>/dev/null | openssl dgst -sha256 -hex | sed 's/^.* //')
-        echo "sudo kubeadm join 192.168.9.11:6443 --token $token --discovery-token-ca-cert-hash sha256:$hash" > /vagrant/worker_join.sh 
+        echo "sudo kubeadm join 192.168.33.11:6443 --token $token --discovery-token-ca-cert-hash sha256:$hash" > /vagrant/worker_join.sh 
         chmod +x /vagrant/worker_join.sh
       else 
         echo "Manager $hostname has inited."
@@ -241,6 +241,21 @@ deb http://mirrors.aliyun.com/ubuntu/ $(lsb_release -cs)-backports main restrict
       else
         /vagrant/worker_join.sh 
       fi      
+    fi
+  SHELL
+
+  config.vm.provision "shell", privileged: false, args: [IN_CHINA], inline: <<-SHELL 
+    echo "Config Dashboard Config"
+    if [[ $(hostname) == "u1" ]]; then
+      cd /vagrant
+      if [[ ! -f ./k8s_config/dashboard/dashboard_v2.0.0-beta5.yaml ]]; then
+        curl -L  https://raw.githubusercontent.com/kubernetes/dashboard/v2.0.0-beta5/aio/deploy/recommended.yaml -o dashboard_v2.0.0-beta5.yaml
+      fi
+      kubectl apply -f ./k8s_config/dashboard/dashboard_v2.0.0-beta5.yaml
+      kubectl apply -f ./k8s_config/dashboard/dashboard-adminuser.yaml
+      echo "token to login dashboard by exec:\n"
+      echo 'kubectl -n kubernetes-dashboard describe secret $(kubectl -n kubernetes-dashboard get secret | grep admin-user | awk '{print $1}') | grep -e token: | awk -F  ':' '{print $2}''
+      kubectl -n kubernetes-dashboard describe secret $(kubectl -n kubernetes-dashboard get secret | grep admin-user | awk '{print $1}') | grep -e token: | awk -F  ':' '{print $2}'
     fi
   SHELL
 
@@ -275,7 +290,7 @@ deb http://mirrors.aliyun.com/ubuntu/ $(lsb_release -cs)-backports main restrict
           sudo apt-get update
           sudo apt-get install -y nfs-kernel-server
           sudo mkdir -p /srv/nfs4 && sudo chown $(id -u):$(id -g) /srv/nfs4
-          echo "/srv/nfs4  192.168.9.0/24(rw,sync,fsid=0,crossmnt,no_subtree_check,insecure)" | sudo  tee  -a /etc/exports
+          echo "/srv/nfs4  192.168.33.0/24(rw,sync,fsid=0,crossmnt,no_subtree_check,insecure)" | sudo  tee  -a /etc/exports
           sudo /etc/init.d/nfs-kernel-server restart
       fi
     fi
