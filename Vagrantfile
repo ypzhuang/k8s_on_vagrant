@@ -4,8 +4,8 @@
 NODE_VCPUS = 4 #number of cpu
 NODE_MASTER_MEMORY_SIZE = 4096 # memory size of master node(MB)
 NODE_WORKER_MEMORY_SIZE = 2048 # memory size of worker nodes(MB)
-NODES = 3 # number of nodes, you can set 1 only for a master node
-IN_CHINA = 'no' # yes or no,  yes: who who cannot connect to Google K8S source.
+NODES = 1 # number of nodes, you can set 1 only for a master node
+IN_CHINA = 'yes' # yes or no,  yes: who who cannot connect to Google K8S source.
 UBUNTU_RELEASE = "ubuntu/bionic64"  # ubuntu/xenial64:16.04 ubuntu/bionic64:18.04
 
 def workerIP(num)
@@ -116,18 +116,18 @@ deb http://mirrors.aliyun.com/ubuntu/ $(lsb_release -cs)-backports main restrict
   SHELL
 
 
-  config.vm.provision "shell", privileged: false, args: [NODES], inline: <<-SHELL
-    if grep -qF "192.168.33" /etc/hosts;then
-      echo "Host mapping skips."
-    else
-       echo "Host name mapping"       
-       number=$1
-       for i in $(seq 1 $number) 
-       do  
-         echo "192.168.33.1$i u$i" | sudo tee -a /etc/hosts
-       done       
-    fi     
-  SHELL
+  # config.vm.provision "shell", privileged: false, args: [NODES], inline: <<-SHELL
+  #   if grep -qF "192.168.33" /etc/hosts;then
+  #     echo "Host mapping skips."
+  #   else
+  #      echo "Host name mapping"       
+  #      number=$1
+  #      for i in $(seq 1 $number) 
+  #      do  
+  #        echo "192.168.33.1$i u$i" | sudo tee -a /etc/hosts
+  #      done       
+  #   fi     
+  # SHELL
 
   # config.vm.provision "shell", privileged: false, inline: <<-SHELL 
   #     echo 'Install docker-compose'
@@ -292,6 +292,16 @@ deb http://mirrors.aliyun.com/ubuntu/ $(lsb_release -cs)-backports main restrict
           sudo mkdir -p /srv/nfs4 && sudo chown $(id -u):$(id -g) /srv/nfs4
           echo "/srv/nfs4  192.168.33.0/24(rw,sync,fsid=0,crossmnt,no_subtree_check,insecure)" | sudo  tee  -a /etc/exports
           sudo /etc/init.d/nfs-kernel-server restart
+      fi
+    fi
+  SHELL
+
+   config.vm.provision "shell", privileged: false, inline: <<-SHELL
+    echo 'Install Ingress'
+    if [[ "$(hostname)" == "u1" ]]; then
+      if [[ $(kubectl get pods -n projectcontour | wc -l) == 0 ]]; then       
+            kubectl apply -f /vagrant/k8s_config/contour/contour.yaml
+            kubectl apply -f /vagrant/k8s_config/contour/kuard.yaml         
       fi
     fi
   SHELL
